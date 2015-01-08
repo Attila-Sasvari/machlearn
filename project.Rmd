@@ -1,0 +1,94 @@
+## Practical Machine Learning Course Project
+
+### Executive Summary
+
+This analyses works with measurements of people performing barbell lifts correctly and incorrectly. The first step is to create a model based on training data. Then I make a validation to know the accuracy and error rate. Finally, predict 20 test data entry using my model to tell how well they did it.
+
+### Tidying data
+
+We will use caret and randomForest libraries.
+
+```{r}
+require(caret)
+require(randomForest)
+```
+
+Read into the specified training and test datasets. Then I remove the first column which is just the number of rows, and save *classe* column into a new variable for later use.
+
+```{r}
+training <- read.csv("pml-training.csv"); training <- training[,-1]
+testing <- read.csv("pml-testing.csv"); testing <- testing[,-1]
+tr_classe <- training$classe
+```
+
+As the data has 160 columns, we keep only those for the prediction whom class are numeric or integer. Do the same with testing. 
+
+```{r}
+cols <- lapply(training, class) %in% c("numeric","integer")
+training <- training[,cols]
+testing <- testing[,cols]
+```
+
+Many columns have a lot of NA values. This tells how many have NAs (FALSE column) in more than 95% of the rows.
+
+```{r}
+table(apply(is.na(training), 2, mean) <= 0.95)
+```
+
+I decide to remove columns where the NA values' proportion is so high. I then add the classe column to the training set to use it during the prediction.
+
+```{r}
+keep <- (apply(is.na(training), 2, mean) <= 0.95)
+training <- training[,keep]
+testing <- testing[,keep]
+training$classe <- tr_classe
+```
+
+
+### Defining training, testing and validation data sets
+
+Set the seed to make my work reproducible.
+
+I create a validation set from the training set (20%). The remaining (80%) will be my actual training set.
+
+```{r}
+set.seed(12345)
+validation <- createDataPartition(y = as.character(training$classe), p = 0.2, list = FALSE)
+training_tr <- training[-validation,]; validation <- training[validation,]
+```
+
+### Prediction
+
+Create a random forest model used by the training set. Use randomForest package instead of carot's train function, as this one gives quicker result due to its default settings. You can see the result, including the out of bag error rate: 0.12%.
+
+```{r}
+rf_model <- randomForest(classe ~., data = training_tr, proximity = TRUE)
+rf_model
+```
+
+Given the model, I am now predicting the classe values of the validation set.
+
+```{r}
+rf_pred <- predict(rf_model, newdata = validation)
+```
+
+I compare my model's prediction with the actual classe outcomes to see the accuracy and the error rate.
+
+```{r}
+confusionMatrix(rf_pred, validation$classe)
+```
+
+**The accuracy is 99.92%.** With this accuracy, we can be quite confident about the result which we want to get out of the test set. **Using this accuracy, it's easy to estimate the expected out of sample error: 1 - Accuracy = 1 - 99.92% = 0.08%.**
+
+### Prediction agains test set
+
+Here is the prediction of classe of the provided 20 test data sets. I am also showing the result.
+
+```{r}
+test_pred <- predict(rf_model, newdata = testing)
+test_pred
+```
+
+### Conclusion
+
+Random forest prediction model in this given case gives 99.92% accuracy. The course has a submission page, where the results I got were worth 20 points from the possible 20.
